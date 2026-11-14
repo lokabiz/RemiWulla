@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penghitung Poin Remi (4 Pemain)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Hilangkan panah spinner pada input number */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center p-4 sm:p-6">
+
+    <!-- Kotak Notifikasi Toast (Pengganti alert) -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden transition-all duration-300">
+        <div id="toastContent" class="px-5 py-3 rounded-xl shadow-2xl font-medium text-sm flex items-center gap-2 border"></div>
+    </div>
+
+    <!-- Modal Konfirmasi Reset (Pengganti confirm) -->
+    <div id="resetModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-2">Reset Permainan?</h3>
+            <p class="text-slate-400 text-sm mb-6">Semua total poin dan riwayat Game akan dihapus dan dikembalikan ke 0. Tindakan ini tidak bisa dibatalkan.</p>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeResetModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm transition">
+                    Batal
+                </button>
+                <button type="button" onclick="confirmResetGame()" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm transition shadow-lg shadow-rose-600/20">
+                    Ya, Reset Semua
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-full max-w-5xl">
+        <!-- Header -->
+        <header class="text-center mb-6 sm:mb-8">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-3">
+                <span>🃏</span> Kalkulator Skor Kartu Remi
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">Penghitung Poin Remi</h1>
+            <p class="text-slate-400 text-sm max-w-xl mx-auto">
+                Klik nama pemain untuk mengubahnya, tandai pemenang <span class="text-indigo-400 font-semibold">🏆 Remi</span>, dan pantau posisi <span class="text-amber-400 font-semibold">🪨 Batu Kecil</span> serta <span class="text-rose-400 font-semibold">🗿 Batu Besar</span>.
+            </p>
+        </header>
+
+        <!-- Pengaturan Cepat & Legenda -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 mb-6">
+            <div class="flex flex-wrap justify-center gap-2 text-xs">
+                <div class="flex items-center gap-1.5 bg-slate-950 border border-yellow-500/30 px-2.5 py-1 rounded-full text-yellow-400">
+                    <span>👑</span> <span>Tertinggi</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-950 border border-amber-500/30 px-2.5 py-1 rounded-full text-amber-400">
+                    <span>🪨</span> <span>Batu Kecil (Ke-3)</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-950 border border-rose-500/30 px-2.5 py-1 rounded-full text-rose-400">
+                    <span>🗿</span> <span>Batu Besar (Ke-4)</span>
+                </div>
+            </div>
+
+            <!-- Pengaturan Poin Bonus Remi -->
+            <div class="flex items-center gap-2 text-xs">
+                <label for="remiBonusInput" class="text-slate-400 font-medium whitespace-nowrap">Bonus Poin Remi:</label>
+                <input type="number" id="remiBonusInput" value="100" min="0" step="5"
+                       onchange="updateRemiBonus(this.value)"
+                       class="w-20 bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:outline-none rounded-lg py-1.5 px-2 text-center font-bold text-indigo-400">
+            </div>
+        </div>
+
+        <!-- Bar Status Game Berjalan -->
+        <div id="activeGameBanner" class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 mb-6">
+            <div class="flex items-center gap-3">
+                <span class="flex h-3 w-3 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                </span>
+                <div>
+                    <h2 id="activeGameTitle" class="text-sm sm:text-base font-bold text-white">Mengisi Skor: Game 1</h2>
+                    <p id="activeGameSubtitle" class="text-xs text-slate-400">Isi poin ke-4 pemain untuk otomatis menyimpan baris Game 1.</p>
+                </div>
+            </div>
+            <button type="button" id="saveGameBtn" onclick="commitCurrentGame()" 
+                    class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/20">
+                💾 Kunci & Simpan Baris Game
+            </button>
+        </div>
+
+        <!-- Grid 4 Kartu Pemain -->
+        <div id="playersContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Kartu dirender lengkap lewat JavaScript -->
+        </div>
+
+        <!-- Kontrol Riwayat -->
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <div class="flex items-center gap-2">
+                <h2 class="text-lg font-bold text-white">Riwayat Skor Per Game</h2>
+                <span id="roundCount" class="text-xs font-semibold bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full">0 Game</span>
+            </div>
+            <div class="flex gap-2">
+                <button type="button" onclick="undoLastAction()" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white font-semibold text-xs sm:text-sm transition active:scale-95">
+                    <span>↩</span> Batalkan Terakhir
+                </button>
+                <button type="button" onclick="openResetModal()" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white font-semibold text-xs sm:text-sm transition active:scale-95">
+                    <span>🗑️</span> Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabel Riwayat -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-center border-collapse">
+                    <thead>
+                        <tr id="tableHeader" class="bg-slate-800/70 text-slate-300 text-xs sm:text-sm uppercase tracking-wider border-b border-slate-800">
+                            <th class="py-3.5 px-3 w-24">Game</th>
+                            <th class="py-3.5 px-3">Pemain 1</th>
+                            <th class="py-3.5 px-3">Pemain 2</th>
+                            <th class="py-3.5 px-3">Pemain 3</th>
+                            <th class="py-3.5 px-3">Pemain 4</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody" class="divide-y divide-slate-800/70 text-sm">
+                        <tr>
+                            <td colspan="5" class="py-8 text-slate-500">Belum ada catatan Game.</td>
+                        </tr>
+                    </tbody>
+                    <tfoot id="tableFooter" class="bg-slate-800/40 font-bold border-t border-slate-700 text-sm">
+                        <!-- Total akhir di bawah tabel -->
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State utama permainan
+        let players = [
+            { id: 0, name: "Pemain 1", score: 0 },
+            { id: 1, name: "Pemain 2", score: 0 },
+            { id: 2, name: "Pemain 3", score: 0 },
+            { id: 3, name: "Pemain 4", score: 0 }
+        ];
+
+        let history = [];
+        let currentGameScores = [null, null, null, null];
+        let remiBonus = 100;
+        let remiWinnerIndex = null;
+        let toastTimeout = null;
+
+        // Fungsi aman untuk menampilkan teks pada atribut HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        // Menampilkan notifikasi toast pengganti alert()
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const content = document.getElementById('toastContent');
+            if (!toast || !content) return;
+
+            let styleClass = 'bg-slate-800 border-slate-600 text-white';
+            let icon = 'ℹ️';
+            if (type === 'success') {
+                styleClass = 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200';
+                icon = '✅';
+            } else if (type === 'error') {
+                styleClass = 'bg-rose-950/95 border-rose-500/50 text-rose-200';
+                icon = '⚠️';
+            }
+
+            content.className = `px-5 py-3 rounded-xl shadow-2xl font-medium text-sm flex items-center gap-2 border ${styleClass}`;
+            content.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+
+            toast.classList.remove('hidden');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 2800);
+        }
+
+        // Simpan state ke memori sesi
+        function saveData() {
+            // Disimpan secara in-memory selama sesi berlangsung
+        }
+
+        // Mengubah nilai bonus poin Remi
+        function updateRemiBonus(val) {
+            const parsed = parseInt(val, 10);
+            remiBonus = isNaN(parsed) || parsed < 0 ? 100 : parsed;
+            const bonusInput = document.getElementById('remiBonusInput');
+            if (bonusInput) bonusInput.value = remiBonus;
+            showToast(`Bonus poin Remi diatur ke +${remiBonus}`, 'success');
+        }
+
+        // Fokus ke kotak edit nama pemain saat ikon pensil diklik
+        function focusPlayerName(index) {
+            const input = document.getElementById(`name-input-${index}`);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }
+
+        // Update nama pemain
+        function updateName(index, newName) {
+            const cleanedName = newName.trim() || `Pemain ${index + 1}`;
+            const input = document.getElementById(`name-input-${index}`);
+            if (input) input.value = cleanedName;
+
+            if (players[index].name === cleanedName) return;
+            players[index].name = cleanedName;
+            saveData();
+            renderTableHeaderAndFooter();
+            showToast(`Nama diubah menjadi "${players[index].name}"`, 'success');
+        }
+
+        // Menambahkan angka cepat ke input poin pemain
+        function addQuickChip(index, amount) {
+            const input = document.getElementById(`input-${index}`);
+            if (!input) return;
+            const currentVal = parseInt(input.value, 10) || 0;
+            input.value = currentVal + amount;
+            input.focus();
+        }
+
+        // Mengosongkan kotak angka sementara pemain
+        function clearInputField(index) {
+            const input = document.getElementById(`input-${index}`);
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        // Menandai atau membatalkan pemain yang sudah Remi pada game berjalan
+        function togglePlayerRemi(index) {
+            if (remiWinnerIndex === index) {
+                // Batalkan status Remi
+                remiWinnerIndex = null;
+                currentGameScores[index] = null;
+                renderPlayers();
+                renderHistory();
+                showToast(`Status Remi ${players[index].name} dibatalkan.`, 'info');
+                return;
+            }
+
+            // Jika sebelumnya ada pemain lain yang ditandai Remi, bersihkan dulu
+            if (remiWinnerIndex !== null && remiWinnerIndex !== index) {
+                currentGameScores[remiWinnerIndex] = null;
+            }
+
+            remiWinnerIndex = index;
+            const input = document.getElementById(`input-${index}`);
+            const customVal = input ? parseInt(input.value, 10) : NaN;
+            const awardPoints = !isNaN(customVal) && customVal > 0 ? customVal : remiBonus;
+
+            currentGameScores[index] = awardPoints;
+            if (input) input.value = '';
+
+            renderPlayers();
+            renderHistory();
+
+            if (currentGameScores.every(val => val !== null)) {
+                commitCurrentGame();
+            } else {
+                showToast(`🏆 ${players[index].name} ditandai REMI (+${awardPoints})!`, 'success');
+            }
+        }
+
+        // Menentukan status peringkat (Mahkota, Batu Kecil, Batu Besar)
+        function getPlayerBadges() {
+            const hasScores = players.some(p => p.score !== 0);
+            if (!hasScores) return {};
+
+            // Urutkan salinan pemain dari skor tertinggi ke terendah
+            const sorted = [...players].sort((a, b) => b.score - a.score);
+            const badges = {};
+
+            // Peringkat 1 (Tertinggi) -> Mahkota
+            badges[sorted[0].id] = {
+                label: '👑 Tertinggi',
+                cardBorder: 'border-yellow-500/70 shadow-yellow-500/10',
+                pillClass: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/40'
+            };
+
+            // Peringkat 3 (Terendah kedua) -> Batu Kecil
+            if (sorted[2].score < sorted[0].score) {
+                badges[sorted[2].id] = {
+                    label: '🪨 Batu Kecil',
+                    cardBorder: 'border-amber-500/70 shadow-amber-500/10',
+                    pillClass: 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                };
+            }
+
+            // Peringkat 4 (Paling rendah) -> Batu Besar
+            if (sorted[3].score < sorted[0].score) {
+                badges[sorted[3].id] = {
+                    label: '🗿 Batu Besar',
+                    cardBorder: 'border-rose-500/80 shadow-rose-500/15',
+                    pillClass: 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                };
+            }
+
+            return badges;
+        }
+
+        // Render ulang ke-4 kartu pemain secara lengkap
+        function renderPlayers() {
+            const container = document.getElementById('playersContainer');
+            if (!container) return;
+
+            const badges = getPlayerBadges();
+            container.innerHTML = '';
+
+            players.forEach((player, index) => {
+                const badge = badges[player.id];
+                const isRemiWinner = remiWinnerIndex === index;
+                const pendingVal = currentGameScores[index];
+
+                let scoreColor = 'text-white';
+                if (player.score > 0) scoreColor = 'text-emerald-400';
+                if (player.score < 0) scoreColor = 'text-rose-400';
+
+                let cardBorderClass = 'border-slate-800';
+                if (isRemiWinner) {
+                    cardBorderClass = 'border-indigo-500 ring-2 ring-indigo-500/30';
+                } else if (badge) {
+                    cardBorderClass = badge.cardBorder;
+                }
+
+                const card = document.createElement('div');
+                card.className = `bg-slate-900 border ${cardBorderClass} rounded-2xl p-4 shadow-xl flex flex-col justify-between transition-all duration-200`;
+
+                card.innerHTML = `
+                    <div>
+                        <!-- Header Kartu: Badge Peringkat -->
+                        <div class="flex items-center justify-between gap-2 min-h-[26px] mb-2.5">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pemain #${index + 1}</span>
+                            ${badge ? `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badge.pillClass}">${badge.label}</span>` : ''}
+                        </div>
+
+                        <!-- Kotak Edit Nama Pemain -->
+                        <div class="relative flex items-center mb-3">
+                            <input type="text"
+                                   id="name-input-${index}"
+                                   value="${escapeHtml(player.name)}"
+                                   onchange="updateName(${index}, this.value)"
+                                   onblur="updateName(${index}, this.value)"
+                                   onkeydown="if(event.key==='Enter'){ this.blur(); }"
+                                   placeholder="Nama Pemain ${index + 1}"
+                                   aria-label="Edit nama ${escapeHtml(player.name)}"
+                                   class="w-full bg-slate-950 hover:bg-slate-950/80 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl py-2 pl-3 pr-9 text-white font-bold text-sm sm:text-base transition">
+                            <button type="button"
+                                    onclick="focusPlayerName(${index})"
+                                    title="Edit Nama Pemain"
+                                    class="absolute right-2 p-1.5 text-slate-400 hover:text-indigo-400 rounded-lg transition">
+                                ✏️
+                            </button>
+                        </div>
+
+                        <!-- Total Skor Akumulasi -->
+                        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl py-3 px-2 text-center mb-3">
+                            <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Skor Akhir</div>
+                            <div class="text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5 ${scoreColor}">${player.score}</div>
+                        </div>
+
+                        <!-- Status Skor Game Berjalan -->
+                        <div class="flex items-center justify-between text-xs bg-slate-800/60 rounded-lg px-3 py-2 mb-3">
+                            <span class="text-slate-400">Game ${history.length + 1}:</span>
+                            <span id="pending-badge-${index}" class="font-semibold text-slate-500">Belum diisi</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2.5">
+                        <!-- Tombol Tandai Sudah Remi -->
+                        <button type="button"
+                                onclick="togglePlayerRemi(${index})"
+                                class="w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border transition active:scale-95 ${
+                                    isRemiWinner
+                                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
+                                    : 'bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-300'
+                                }">
+                            <span>🏆</span>
+                            <span>${isRemiWinner ? 'Sudah Remi (Aktif)' : 'Tandai Sudah Remi'}</span>
+                        </button>
+
+                        <!-- Input Angka & Tombol Hapus Angka -->
+                        <div class="relative flex items-center">
+                            <input type="number"
+                                   id="input-${index}"
+                                   min="0"
+                                   inputmode="numeric"
+                                   onkeydown="if(event.key==='Enter'){ applyPoint(${index}, 'plus'); }"
+                                   placeholder="Masukkan poin..."
+                                   class="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:outline-none rounded-xl py-2.5 px-3 text-center text-base font-bold text-white placeholder:text-slate-600 placeholder:font-normal">
+                            <button type="button"
+                                    onclick="clearInputField(${index})"
+                                    title="Bersihkan angka"
+                                    class="absolute right-2 text-xs text-slate-500 hover:text-slate-300 px-1.5 py-1">
+                                ✕
+                            </button>
+                        </div>
+
+                        <!-- Chip Tambah Angka Cepat -->
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button type="button" onclick="addQuickChip(${index}, 5)" class="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition active:scale-95">+5</button>
+                            <button type="button" onclick="addQuickChip(${index}, 10)" class="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition active:scale-95">+10</button>
+                            <button type="button" onclick="addQuickChip(${index}, 25)" class="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition active:scale-95">+25</button>
+                            <button type="button" onclick="addQuickChip(${index}, 50)" class="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition active:scale-95">+50</button>
+                        </div>
+
+                        <!-- Tombol Aksi Poin: Tambah, Kurang, Nol -->
+                        <div class="grid grid-cols-3 gap-1.5 pt-0.5">
+                            <button type="button" onclick="applyPoint(${index}, 'plus')" class="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 shadow-md shadow-emerald-600/20">
+                                + Tambah
+                            </button>
+                            <button type="button" onclick="applyPoint(${index}, 'minus')" class="py-2.5 px-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition active:scale-95 shadow-md shadow-rose-600/20">
+                                - Kurang
+                            </button>
+                            <button type="button" onclick="applyPoint(${index}, 'zero')" class="py-2.5 px-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold text-xs transition active:scale-95">
+                                0 Nol
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            updatePendingDisplay();
+            updateActiveGameBanner();
+            renderTableHeaderAndFooter();
+        }
+
+        // Memperbarui tampilan status poin game berjalan pada tiap kartu pemain & banner
+        function updatePendingDisplay() {
+            currentGameScores.forEach((val, idx) => {
+                const badgeEl = document.getElementById(`pending-badge-${idx}`);
+                if (!badgeEl) return;
+
+                const trophy = remiWinnerIndex === idx ? '🏆 ' : '';
+
+                if (val === null) {
+                    badgeEl.textContent = 'Belum diisi';
+                    badgeEl.className = 'font-semibold text-slate-500';
+                } else if (val > 0) {
+                    badgeEl.textContent = `${trophy}+${val}`;
+                    badgeEl.className = 'font-bold text-emerald-400';
+                } else if (val < 0) {
+                    badgeEl.textContent = `${trophy}${val}`;
+                    badgeEl.className = 'font-bold text-rose-400';
+                } else {
+                    badgeEl.textContent = `${trophy}0 (Nol)`;
+                    badgeEl.className = 'font-bold text-slate-300';
+                }
+            });
+        }
+
+        // Memperbarui banner Game berjalan
+        function updateActiveGameBanner() {
+            const titleEl = document.getElementById('activeGameTitle');
+            const subEl = document.getElementById('activeGameSubtitle');
+            const saveBtn = document.getElementById('saveGameBtn');
+            const nextGameNum = history.length + 1;
+            const filledCount = currentGameScores.filter(v => v !== null).length;
+
+            if (titleEl) {
+                titleEl.textContent = `Mengisi Skor: Game ${nextGameNum}`;
+            }
+            if (subEl) {
+                subEl.textContent = filledCount === 0
+                    ? `Isi poin ke-4 pemain untuk otomatis menyimpan baris Game ${nextGameNum}.`
+                    : `${filledCount} dari 4 pemain sudah diisi. Pemain kosong otomatis bernilai 0 jika dikunci manual.`;
+            }
+            if (saveBtn) {
+                saveBtn.disabled = filledCount === 0;
+            }
+        }
+
+        // Render header dan footer total skor pada tabel riwayat
+        function renderTableHeaderAndFooter() {
+            const header = document.getElementById('tableHeader');
+            const footer = document.getElementById('tableFooter');
+            const badges = getPlayerBadges();
+
+            if (header) {
+                header.innerHTML = `
+                    <th class="py-3.5 px-3 w-24">Game</th>
+                    ${players.map(p => `<th class="py-3.5 px-3">${escapeHtml(p.name)}</th>`).join('')}
+                `;
+            }
+
+            if (footer) {
+                footer.innerHTML = `
+                    <tr>
+                        <td class="py-3.5 px-3 text-slate-400 uppercase text-xs tracking-wider">Total</td>
+                        ${players.map(p => {
+                            let colorClass = 'text-white';
+                            if (p.score > 0) colorClass = 'text-emerald-400';
+                            if (p.score < 0) colorClass = 'text-rose-400';
+                            const badgeIcon = badges[p.id] ? ` ${badges[p.id].label.split(' ')[0]}` : '';
+                            return `<td class="py-3.5 px-3 text-base ${colorClass}">${p.score}${badgeIcon}</td>`;
+                        }).join('')}
+                    </tr>
+                `;
+            }
+        }
+
+        // Proses input Tambah, Kurang, atau Nol Poin untuk pemain tertentu
+        function applyPoint(playerIndex, type) {
+            const inputEl = document.getElementById(`input-${playerIndex}`);
+            const rawValue = inputEl ? parseInt(inputEl.value, 10) : NaN;
+
+            let delta = 0;
+            if (type === 'zero') {
+                delta = 0;
+            } else {
+                if (isNaN(rawValue) || rawValue <= 0) {
+                    showToast("Masukkan angka poin lebih dari 0 terlebih dahulu!", "error");
+                    if (inputEl) inputEl.focus();
+                    return;
+                }
+                delta = type === 'plus' ? rawValue : -rawValue;
+            }
+
+            currentGameScores[playerIndex] = delta;
+            if (inputEl) inputEl.value = '';
+
+            updatePendingDisplay();
+            updateActiveGameBanner();
+            renderHistory();
+
+            // Jika ke-4 pemain sudah terisi semua, langsung simpan 1 baris Game
+            if (currentGameScores.every(val => val !== null)) {
+                commitCurrentGame();
+            } else {
+                const formatted = delta > 0 ? `+${delta}` : `${delta}`;
+                showToast(`Poin ${players[playerIndex].name} dicatat (${formatted}).`, "success");
+            }
+        }
+
+        // Menyimpan 1 baris Game penuh ke tabel riwayat dan memperbarui total skor
+        function commitCurrentGame() {
+            if (currentGameScores.every(val => val === null)) {
+                showToast("Isi minimal 1 poin pemain sebelum menyimpan Game.", "error");
+                return;
+            }
+
+            const finalRound = currentGameScores.map(val => val === null ? 0 : val);
+
+            // Tambahkan poin tiap pemain ke total skor masing-masing
+            finalRound.forEach((val, idx) => {
+                players[idx].score += val;
+            });
+
+            // Simpan 1 baris penuh (Pemain 1 s/d Pemain 4) ke riwayat Game
+            history.push({
+                gameNumber: history.length + 1,
+                scores: finalRound,
+                remiWinner: remiWinnerIndex
+            });
+
+            // Reset baris Game berjalan untuk Game berikutnya
+            currentGameScores = [null, null, null, null];
+            remiWinnerIndex = null;
+
+            saveData();
+            renderPlayers();
+            renderHistory();
+            showToast(`Game ${history.length} berhasil disimpan!`, "success");
+        }
+
+        // Render tabel riwayat secara berurutan dari Game 1, Game 2, dst.
+        function renderHistory() {
+            const tbody = document.getElementById('historyBody');
+            const roundCount = document.getElementById('roundCount');
+            if (roundCount) roundCount.textContent = `${history.length} Game`;
+            if (!tbody) return;
+
+            const hasPending = currentGameScores.some(val => val !== null);
+
+            if (history.length === 0 && !hasPending) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-slate-500">Belum ada catatan Game. Isi poin tiap pemain di atas untuk memulai Game 1.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            // 1. Tampilkan baris Game 1, Game 2, dst. secara berurutan dari atas ke bawah
+            history.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-800/40 transition';
+                
+                const rowScores = item.scores || [0, 0, 0, 0];
+                let cellsHtml = `<td class="py-3.5 px-3 font-bold text-indigo-400 whitespace-nowrap">Game ${index + 1}</td>`;
+                
+                rowScores.forEach((val, pIdx) => {
+                    const isWinner = item.remiWinner === pIdx;
+                    const trophy = isWinner ? '<span title="Pemain Remi" class="mr-1">🏆</span>' : '';
+                    if (val === null || val === 0) {
+                        cellsHtml += `<td class="py-3.5 px-3 text-slate-400 font-semibold">${trophy}0</td>`;
+                    } else if (val > 0) {
+                        cellsHtml += `<td class="py-3.5 px-3 text-emerald-400 font-bold">${trophy}+${val}</td>`;
+                    } else {
+                        cellsHtml += `<td class="py-3.5 px-3 text-rose-400 font-bold">${trophy}${val}</td>`;
+                    }
+                });
+
+                row.innerHTML = cellsHtml;
+                tbody.appendChild(row);
+            });
+
+            // 2. Jika ada Game yang sedang diisi sebagian, tampilkan baris pratinjau di bawahnya
+            if (hasPending) {
+                const nextGameNum = history.length + 1;
+                const pendingRow = document.createElement('tr');
+                pendingRow.className = 'bg-indigo-950/30 border-t border-dashed border-indigo-500/40';
+                
+                let cellsHtml = `
+                    <td class="py-3.5 px-3 font-bold text-amber-400 whitespace-nowrap">
+                        Game ${nextGameNum} <span class="block text-[10px] font-normal text-amber-300/80">(Berjalan)</span>
+                    </td>
+                `;
+
+                currentGameScores.forEach((val, pIdx) => {
+                    const trophy = remiWinnerIndex === pIdx ? '<span class="mr-1">🏆</span>' : '';
+                    if (val === null) {
+                        cellsHtml += `<td class="py-3.5 px-3 text-slate-500 italic text-xs">Menunggu...</td>`;
+                    } else if (val > 0) {
+                        cellsHtml += `<td class="py-3.5 px-3 text-emerald-400 font-bold">${trophy}+${val}</td>`;
+                    } else if (val < 0) {
+                        cellsHtml += `<td class="py-3.5 px-3 text-rose-400 font-bold">${trophy}${val}</td>`;
+                    } else {
+                        cellsHtml += `<td class="py-3.5 px-3 text-slate-300 font-semibold">${trophy}0</td>`;
+                    }
+                });
+
+                pendingRow.innerHTML = cellsHtml;
+                tbody.appendChild(pendingRow);
+            }
+        }
+
+        // Batalkan Game terakhir atau input sementara yang sedang berjalan
+        function undoLastAction() {
+            if (currentGameScores.some(val => val !== null)) {
+                currentGameScores = [null, null, null, null];
+                remiWinnerIndex = null;
+                renderPlayers();
+                renderHistory();
+                showToast("Input pada Game berjalan dibersihkan.", "success");
+                return;
+            }
+
+            if (history.length === 0) {
+                showToast("Belum ada riwayat Game untuk dibatalkan.", "error");
+                return;
+            }
+
+            const lastGame = history.pop();
+            const rowScores = lastGame.scores || [0, 0, 0, 0];
+            rowScores.forEach((val, idx) => {
+                if (val !== null) players[idx].score -= val;
+            });
+
+            saveData();
+            renderPlayers();
+            renderHistory();
+            showToast(`Baris Game ${history.length + 1} dibatalkan.`, "success");
+        }
+
+        // Kontrol Modal Reset
+        function openResetModal() {
+            const modal = document.getElementById('resetModal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('resetModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmResetGame() {
+            players.forEach(p => p.score = 0);
+            history = [];
+            currentGameScores = [null, null, null, null];
+            remiWinnerIndex = null;
+            saveData();
+            renderPlayers();
+            renderHistory();
+            closeResetModal();
+            showToast("Permainan berhasil direset ke 0.", "success");
+        }
+
+        // Inisialisasi aplikasi saat halaman dimuat
+        function initApp() {
+            renderPlayers();
+            renderHistory();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+    </script>
+</body>
+</html>
